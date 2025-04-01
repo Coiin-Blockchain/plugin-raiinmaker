@@ -1,6 +1,19 @@
 {
-    "name": "@elizaos/plugin-raiinmaker",
+    "name": "@elizaos-plugins/plugin-raiinmaker",
     "version": "0.1.0",
+    "agentConfig": {
+        "pluginType": "elizaos:plugin:1.0.0",
+        "pluginParameters": {
+            "RAIINMAKER_API_KEY": {
+                "type": "string",
+                "description": "API key for the Raiinmaker service"
+            },
+            "RAIINMAKER_APP_ID": {
+                "type": "string",
+                "description": "App ID for the Raiinmaker service, from the seed panel"
+            }
+        }
+    },
     "type": "module",
     "description": "Eliza plugin for Raiinmaker content verification",
     "main": "dist/index.js",
