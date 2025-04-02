@@ -88,10 +88,11 @@ RAIINMAKER_API_URL='https://server.api.raiinmaker.com/external'
 TWITTER_APPROVAL_ENABLED=false    # Optional, Default: false
 TWITTER_APPROVAL_CHECK_INTERVAL=60 # Optional, Default: 60
 TWITTER_APPROVAL_PROVIDER=RAIINMAKER # RAIINMAKER or DISCORD, Default: RAIINMAKER
-
+OPENAI_API_KEY =                  # OpenAi API key for pre-verification step
 
 ```
-Get your AppId and API key on the [raiinmaker seed panel](https://seed.raiinmaker.com/)
+* Get your AppId and API key on the [raiinmaker seed panel](https://seed.raiinmaker.com/)
+* To preform pre-verification, you must have an OpenAI api Key
 
 Then, in your `/packages/client-twitter/post.ts`
 ```typescript
