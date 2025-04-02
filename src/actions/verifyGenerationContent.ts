@@ -1,3 +1,4 @@
+// src/actions/verifyGenerationContent.ts
 import { 
     Action,
     IAgentRuntime,
@@ -8,6 +9,7 @@ import {
     ActionExample
 } from "@elizaos/core";
 import { createRaiinmakerService, RaiinmakerApiError } from "../services/raiinmakerService";
+import { preVerifyContent } from "../services/contentPreVerificationService";
 import { extractVerifiableContent } from "../utils/contentExtractor";
 import { ensureUUID } from "../utils/uuidHelpers";
 import { z } from "zod";
@@ -20,9 +22,11 @@ const verifyGenerationContentOptionsSchema = z.object({
     question: z.string().optional(),
     roomId: z.string().optional(),
     name: z.string().optional(),
+    // Add option to skip pre-verification for testing/comparison
+    skipPreVerification: z.boolean().optional(),
 }).optional();
 
-// Add before the action definition
+// Action examples (existing code)
 const verifyGenerationContentExamples: ActionExample[][] = [
     [
         {
@@ -91,12 +95,6 @@ Please ensure the following environment variables are set:
                 }
                 return false;
             }
-            
-            // Create service with credentials from environment
-            const raiinService = createRaiinmakerService(
-                config.RAIINMAKER_API_KEY,
-                config.RAIINMAKER_APP_ID
-            );
 
             // Extract content from message or options
             let contentToVerify: string;
@@ -117,57 +115,132 @@ Please ensure the following environment variables are set:
             }
             
             const userId = ensureUUID(message.userId);
-            elizaLogger.info(`Creating verification task for content from user ${userId}`);
+            elizaLogger.info(`Processing verification for content from user ${userId}`);
 
-            // Create verification task
-            const taskOptions = {
-                name: parsedOptions?.name || "Content Verification",
-                consensusVotes: parsedOptions?.consensusVotes || 3,
-                question: parsedOptions?.question || "Is this content appropriate for an AI agent to post?"
-            };
+            // NEW: Pre-verification step with OpenAI
+            let preVerificationResult: Awaited<ReturnType<typeof preVerifyContent>> | undefined;
+            
+            if (!parsedOptions?.skipPreVerification) {
+                elizaLogger.info("Running content pre-verification check");
+                
+                // Get any custom checklist from character settings if available
+                let customChecklist: string[] | undefined;
+                
+                // Safely access the contentChecklist from settings using type assertion
+                const settings = runtime.character?.settings as Record<string, any>;
+                if (settings && Array.isArray(settings.contentChecklist)) {
+                    customChecklist = settings.contentChecklist;
+                    elizaLogger.debug("Using custom content checklist from character settings");
+                }
+                
+                preVerificationResult = await preVerifyContent(
+                    runtime,
+                    contentToVerify,
+                    customChecklist
+                );
+                
+                // If content passes pre-verification, return success and skip human verification
+                if (preVerificationResult.passes) {
+                    elizaLogger.info("Content passed pre-verification checks, skipping human verification");
+                    
+                    if (callback) {
+                        callback({
+                            text: `
+I've analyzed your content using AI verification and it looks good to go!
 
-            const verificationResult = await raiinService.createGenerationVerificationTask(
-                contentToVerify,
-                taskOptions
-            );
+📋 Content: "${contentToVerify.substring(0, 100)}${contentToVerify.length > 100 ? '...' : ''}"
 
-            if (!verificationResult || !verificationResult.data || !verificationResult.data.id) {
-                elizaLogger.error("Failed to create verification task: Invalid response from Raiinmaker service");
+✅ All guidelines passed
+• Content is appropriate for posting
+• No policy violations found
+
+The content has been approved automatically. No human verification was needed.
+                            `,
+                            status: "approved",
+                            skipHumanVerification: true
+                        });
+                    }
+                    
+                    // Create a memory to track this auto-approved verification
+                    await runtime.messageManager.createMemory({
+                        id: ensureUUID(`verification-auto-approved-${Date.now()}`),
+                        userId: userId,
+                        agentId: ensureUUID(runtime.agentId),
+                        content: { 
+                            text: `Content auto-approved by AI verification: "${contentToVerify.substring(0, 50)}..."`,
+                            metadata: {
+                                taskType: "contentAutoApproved",
+                                content: contentToVerify,
+                                timestamp: Date.now()
+                            }
+                        },
+                        roomId: ensureUUID(parsedOptions?.roomId || message.roomId),
+                        createdAt: Date.now()
+                    });
+                    
+                    return true;
+                }
+                
+                elizaLogger.info(`Content failed pre-verification checks: ${preVerificationResult.failedChecks.join(', ')}`);
+                elizaLogger.info("Content failed pre-verification, proceeding to human verification");
+            }
+            
+            // Only continue with Raiinmaker human verification if pre-verification failed or was skipped
+            if (parsedOptions?.skipPreVerification || (preVerificationResult && !preVerificationResult.passes)) {
+                const raiinService = createRaiinmakerService(
+                    config.RAIINMAKER_API_KEY,
+                    config.RAIINMAKER_APP_ID
+                );
+
+                // Create verification task
+                const taskOptions = {
+                    name: parsedOptions?.name || "Content Verification",
+                    consensusVotes: parsedOptions?.consensusVotes || 3,
+                    question: parsedOptions?.question || "Is this content appropriate for an AI agent to post?"
+                };
+
+                const verificationResult = await raiinService.createGenerationVerificationTask(
+                    contentToVerify,
+                    taskOptions
+                );
+
+                if (!verificationResult || !verificationResult.data || !verificationResult.data.id) {
+                    elizaLogger.error("Failed to create verification task: Invalid response from Raiinmaker service");
+                    if (callback) {
+                        callback({
+                            text: "I apologize, but I wasn't able to submit the content for verification. There might be an issue with the verification service."
+                        });
+                    }
+                    return false;
+                }
+
+                // Get the task ID
+                const taskId = verificationResult.data.id;
+                
+                // Use the roomId provided in options, message roomId, or create a consistent one
+                const roomId = ensureUUID(parsedOptions?.roomId || message.roomId);
+                
+                // Create a memory to track this verification
+                await runtime.messageManager.createMemory({
+                    id: ensureUUID(`verification-${taskId}`),
+                    userId: userId,
+                    agentId: ensureUUID(runtime.agentId),
+                    content: { 
+                        text: `Verification task created for "${contentToVerify.substring(0, 50)}..." with ID: ${taskId}`,
+                        metadata: {
+                            taskType: "contentVerification",
+                            taskId: taskId,
+                            content: contentToVerify,
+                            timestamp: Date.now()
+                        }
+                    },
+                    roomId: roomId,
+                    createdAt: Date.now()
+                });
+                
                 if (callback) {
                     callback({
-                        text: "I apologize, but I wasn't able to submit the content for verification. There might be an issue with the verification service."
-                    });
-                }
-                return false;
-            }
-
-            // Get the task ID
-            const taskId = verificationResult.data.id;
-            
-            // Use the roomId provided in options, message roomId, or create a consistent one
-            const roomId = ensureUUID(parsedOptions?.roomId || message.roomId);
-            
-            // Create a memory to track this verification
-            await runtime.messageManager.createMemory({
-                id: ensureUUID(`verification-${taskId}`),
-                userId: userId,
-                agentId: ensureUUID(runtime.agentId),
-                content: { 
-                    text: `Verification task created for "${contentToVerify.substring(0, 50)}..." with ID: ${taskId}`,
-                    metadata: {
-                        taskType: "contentVerification",
-                        taskId: taskId,
-                        content: contentToVerify,
-                        timestamp: Date.now()
-                    }
-                },
-                roomId: roomId,
-                createdAt: Date.now()
-            });
-            
-            if (callback) {
-                callback({
-                    text: `
+                        text: `
 I've submitted your content for verification through the Raiinmaker network.
 
 📋 Content: "${contentToVerify.substring(0, 100)}${contentToVerify.length > 100 ? '...' : ''}"
@@ -179,10 +252,11 @@ The content will be reviewed by human validators in the Raiinmaker network. They
 You can check the status of this verification later by asking me about this task using the Task ID.
 
 ⏳ The verification process typically takes a few minutes to a few hours, depending on validator availability.
-                    `,
-                    taskId: taskId,
-                    status: "pending"
-                });
+                        `,
+                        taskId: taskId,
+                        status: "pending"
+                    });
+                }
             }
             
             return true;
