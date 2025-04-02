@@ -32,9 +32,9 @@ export function formatVerificationStatusResponse(task: TaskWithVotes): Verificat
     
     // Parse the answer value safely
     let parsedAnswer: boolean | null = null;
-    if (task.answer === 'true' || task.answer === 'yes' || task.answer === '1') {
+    if (task.answer === 'true' || task.answer === 'yes') {
       parsedAnswer = true;
-    } else if (task.answer === 'false' || task.answer === 'no' || task.answer === '0') {
+    } else if (task.answer === 'false' || task.answer === 'no') {
       parsedAnswer = false;
     }
     
