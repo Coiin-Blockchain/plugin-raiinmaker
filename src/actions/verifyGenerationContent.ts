@@ -143,6 +143,9 @@ Please ensure the following environment variables are set:
                 if (preVerificationResult.passes) {
                     elizaLogger.info("Content passed pre-verification checks, skipping human verification");
                     
+                    // Create a deterministic task ID for auto-verified content
+                    const autoVerifiedTaskId = ensureUUID(`auto-verified-${Date.now()}`);
+                    
                     if (callback) {
                         callback({
                             text: `
@@ -157,7 +160,21 @@ I've analyzed your content using AI verification and it looks good to go!
 The content has been approved automatically. No human verification was needed.
                             `,
                             status: "approved",
-                            skipHumanVerification: true
+                            skipHumanVerification: true,
+                            // Add these fields for Twitter client compatibility
+                            taskId: autoVerifiedTaskId,
+                            verificationResult: {
+                                taskId: autoVerifiedTaskId,
+                                status: "completed",
+                                answer: true,
+                                question: "Is this content appropriate for posting?",
+                                subject: contentToVerify,
+                                votesReceived: 0,
+                                votesRequired: 0,
+                                votesYes: 0,
+                                votesNo: 0,
+                                formattedText: `✅ Content Verification - The verification is complete. The content was approved automatically by AI.`
+                            }
                         });
                     }
                     
@@ -170,6 +187,7 @@ The content has been approved automatically. No human verification was needed.
                             text: `Content auto-approved by AI verification: "${contentToVerify.substring(0, 50)}..."`,
                             metadata: {
                                 taskType: "contentAutoApproved",
+                                taskId: autoVerifiedTaskId,
                                 content: contentToVerify,
                                 timestamp: Date.now()
                             }
