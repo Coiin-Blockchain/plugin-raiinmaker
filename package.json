@@ -15,7 +15,7 @@
         }
     },
     "type": "module",
-    "description": "Eliza plugin for generated content verification, moderation, and HITL feedback",
+    "description": "Plugin for generated content verification, moderation, and HITL feedback",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "exports": {
