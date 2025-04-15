@@ -15,7 +15,7 @@
         }
     },
     "type": "module",
-    "description": "Eliza plugin for Raiinmaker content verification",
+    "description": "Plugin for generated content verification, moderation, and HITL feedback",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "exports": {
@@ -77,7 +77,7 @@
         "content-verification",
         "moderation"
       ],
-    "author": "Ret Beauregard",
+    "author": "Raiinmaker",
     "license": "MIT",
     "publishConfig": {
         "access": "public"

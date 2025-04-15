@@ -11,22 +11,24 @@ A plugin for the Eliza AI agent framework that integrates with the Raiinmaker co
 
 ## Installation
 
-```bash
-# From your Eliza project root
-pnpm add @elizaos/plugin-raiinmaker
+Go to `eliza/agent/package.json` and in `dependencies` add:
+```
+  "@elizaos-plugins/plugin-raiinmaker": "github:Coiin-Blockchain/plugin-raiinmaker",
 ```
 
 ## Configuration
 
-Configure in your character's JSON file:
+Configure in your character's file:
 
-```json
-{
-  "name": "MyAgent",
-  "plugins": [
-    "@elizaos/plugin-bootstrap",
-    "@elizaos/plugin-raiinmaker"
-  ]
+```
+import pluginRaiinmaker from "@elizaos-plugins/plugin-raiinmaker";
+import twitterPlugin from "@elizaos-plugins/client-twitter";
+xport const defaultCharacter: Character = {
+  plugins: [
+          twitterPlugin,
+          pluginRaiinmaker,
+      ],
+  "name": "MyAgent"
 }
 ```
 
@@ -76,14 +78,22 @@ Agent: Let me verify that data for you.
 
 This plugin works especially well with the Twitter client to verify content before posting:
 
-First, allow twitter approval in your .env file:
+First, allow enable our plugin approval in your .env file:
 ```
 
-TWITTER_APPROVAL_ENABLED=true
-TWITTER_APPROVAL_CHECK_INTERVAL=60
-TWITTER_APPROVAL_PROVIDER=RAIINMAKER  # RAIINMAKER or DISCORD
+RAIINMAKER_API_KEY=               # Required, API Key from seed panel
+RAIINMAKER_APP_ID=                # Required, App ID from seed panel
+RAIINMAKER_ENVIRONMENT=           # Options: development, staging, production
+RAIINMAKER_API_URL='https://server.api.raiinmaker.com/external'
+TWITTER_APPROVAL_ENABLED=false    # Optional, Default: false
+TWITTER_APPROVAL_CHECK_INTERVAL=60 # Optional, Default: 60
+TWITTER_APPROVAL_PROVIDER=RAIINMAKER # RAIINMAKER or DISCORD, Default: RAIINMAKER
+OPENAI_API_KEY =                  # OpenAi API key for pre-verification step
 
 ```
+* Get your AppId and API key on the [raiinmaker seed panel](https://seed.raiinmaker.com/)
+* To preform pre-verification, you must have an OpenAI api Key
+
 Then, in your `/packages/client-twitter/post.ts`
 ```typescript
 // In your Twitter post generation flow
@@ -122,10 +132,6 @@ pnpm test
 # Run specific test
 pnpm test tests/verificationFlow.test.ts
 ```
-
-## API Documentation
-
-This plugin integrates with the Raiinmaker API. For detailed API documentation, see [Raiinmaker API Docs](https://server-staging.api.raiinmaker.com/external/docs/swagger.json).
 
 ## License
 

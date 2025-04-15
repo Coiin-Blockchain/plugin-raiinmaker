@@ -1,7 +1,7 @@
 import { AgentValidationResponse } from '../types';
 
 
-const BASE_URL = "https://server-staging.api.raiinmaker.com/external"
+const BASE_URL = process.env.RAIINMAKER_API_URL || "https://server-staging.api.raiinmaker.com/external";
 
 async function getAgentValidation(
     apiKey: string,

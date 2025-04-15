@@ -1,3 +1,4 @@
+// src/actions/checkVerificationStatus.ts
 import { 
     Action,
     IAgentRuntime,
@@ -9,9 +10,9 @@ import {
 } from "@elizaos/core";
 import { createRaiinmakerService, RaiinmakerApiError } from "../services/raiinmakerService";
 import { ensureUUID } from "../utils/uuidHelpers";
-import { formatTaskStatus } from "../utils/taskFormatter";
+import { formatVerificationStatusResponse } from "../utils/responseFormatter";
 import { z } from "zod";
-import { raiinmakerEnvironment, validateRaiinmakerConfig } from "../environment";
+import { validateRaiinmakerConfig } from "../environment";
 
 // Create example usage patterns for the action
 const checkVerificationStatusExamples: ActionExample[][] = [
@@ -155,17 +156,13 @@ export const checkVerificationStatus: Action = {
                 }
             }
 
-            // Now taskId is guaranteed to be defined if we reach here
             // Get task details
             const taskResult = await raiinService.getTaskById(taskId as string);
-
-            elizaLogger.info(`TASK RESULT FROM RAIINMAKER API: ${JSON.stringify(taskResult, null, 2)}`);
             
             if (!taskResult.success || !taskResult.data) {
                 if (callback) {
                     callback({
                         text: `I couldn't find any verification task with ID ${taskId}. Please check the ID and try again.`,
-                        // Add these fields explicitly
                         status: "unknown",
                         answer: null
                     });
@@ -174,72 +171,38 @@ export const checkVerificationStatus: Action = {
             }
 
             const task = taskResult.data;
-            const status = task.status;
-            const votes = task.votes || [];
-            const totalVotes = votes.length;
-            const requiredVotes = task.consensusVotes;
-            const answer = task.answer;
-
-            elizaLogger.info(`Raw task data: status=${status}, answer=${answer}`);
-
-            let statusMessage: string;
-            let isApproved = false;
             
-            if (status === 'completed') {
-                if (answer === 'true' || answer === 'yes') {
-                    isApproved = true;
-                    statusMessage = `The verification is complete! The content was approved.`;
-                } else {
-                    isApproved = false;
-                    statusMessage = `The verification is complete! The content was rejected.`;
-                }
-            } else if (status === 'pending') {
-                statusMessage = `The verification is still in progress. So far, ${totalVotes} out of ${requiredVotes} required votes have been collected.`;
-            } else {
-                statusMessage = `The verification task is currently in ${status} status.`;
-            }
-
-            let voteInfo = '';
-            if (votes.length > 0) {
-                const yesVotes = votes.filter(v => v.answer === 'true').length;
-                const noVotes = votes.filter(v => v.answer === 'false').length;
-                voteInfo = `\n\nCurrent votes: ${yesVotes} approve, ${noVotes} reject.`;
-            }
-
-            // Use the formatTaskStatus helper if available
-            let formattedOutput = '';
-            try {
-                formattedOutput = formatTaskStatus(task);
-            } catch (error) {
-                // Fall back to simple formatting if helper isn't available
-                formattedOutput = `
-Verification Task Status:
-
-Task ID: ${task.id}
-Subject: "${task.subject}"
-Question: "${task.question}"
-Status: ${status}
-${statusMessage}${voteInfo}
-`;
+            // Parse raw values for logging
+            elizaLogger.info(`Raw task data: status=${task.status}, answer=${task.answer}`);
+            
+            // Use our new formatter to get a clean response
+            const formattedResponse = formatVerificationStatusResponse(task);
+            
+            // Log the formatted response for debugging
+            elizaLogger.info(`FINAL VERIFICATION STATUS: status=${formattedResponse.status}, answer=${formattedResponse.answer}`);
+            
+            // Status-specific detailed logging
+            if (formattedResponse.status === 'completed') {
+                elizaLogger.info(`Task ${taskId} ${formattedResponse.answer ? 'APPROVED' : 'REJECTED'}`);
+            } else if (formattedResponse.status === 'pending') {
+                elizaLogger.info(`PENDING: Task ${taskId} is still pending (status: ${formattedResponse.status})`);
             }
 
             if (callback) {
+                // Return a clean response with both human-readable text and structured data
                 callback({
-                    text: formattedOutput,
-                    // Important: Add these fields explicitly at the top level
-                    status: status,
-                    // Use normalized boolean value
-                    answer: isApproved ? "true" : "false"
+                    text: formattedResponse.formattedText || `Verification status: ${formattedResponse.status}`,
+                    verificationResult: formattedResponse, // Include the entire structured response
+                    status: formattedResponse.status,
+                    answer: formattedResponse.answer
                 });
-                return true;
             }
-
+            
             return true;
         } catch (error) {
             elizaLogger.error("Error in checkVerificationStatus handler:", error);
             callback?.({
                 text: "I apologize, but I'm having trouble checking the verification status at the moment. Please try again later.",
-                // Still include status fields even in error case
                 status: "error",
                 answer: null
             });
