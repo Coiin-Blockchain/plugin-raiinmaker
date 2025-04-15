@@ -450,7 +450,7 @@ export const createRaiinmakerService = (configOrApiKey: RaiinmakerServiceConfig 
                 type: "BOOL",  // Boolean verification is most appropriate for content approval
                 humanRequired: true,
                 consensusVotes: options.consensusVotes || 3,
-                reputation: "ANY",  // Allow any validator to participate
+                reputation: "NORMAL",  // Allow any validator to participate
                 question: options.question || "Is this content appropriate for an AI agent to post?",
                 subject: content  // The content to verify
             };
