@@ -139,7 +139,7 @@ export interface CreateTaskResponse {
         poolId: any;
         humanRequired: boolean;
         consensusVotes: number;
-        reputation: any;
+        reputation: string;
         question: string;
         subject: any;
         imageUrl: any;
