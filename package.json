@@ -51,7 +51,8 @@
         "test:verification": "NODE_OPTIONS='--no-warnings --loader ts-node/esm' ts-node tests/verificationFlow.test.ts"    },
     "peerDependencies": {
         "whatwg-url": "7.1.0",
-        "@elizaos/core": ">=0.0.10"
+        "@elizaos/core": ">=0.0.10",
+        "@langchain/core": ">=0.3.48 <0.4.0"
     },
     "devDependencies": {
         "@types/jest": "^29.5.14",
@@ -80,7 +81,6 @@
     "author": "Raiinmaker",
     "license": "MIT",
     "publishConfig": {
-        "registry": "https://npm.pkg.github.com",
         "access": "public"
     }
 
